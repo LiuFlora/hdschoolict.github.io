@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【机密档案】消失的校长——在线互动探案系统</title>
+    <style>
+        /* ==========================================================================
+           1. 侦探风核心主题与变量设置
+           ========================================================================== */
+        :root {
+            --bg-dark: #0f111a;
+            --panel-bg: #1a1d29;
+            --accent-crimson: #ff3344;
+            --accent-cyan: #00f0ff;
+            --text-light: #e2e8f0;
+            --text-muted: #718096;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace, "微软雅黑";
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px dashed var(--accent-crimson);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            color: var(--accent-crimson);
+            font-size: 2.5rem;
+            letter-spacing: 4px;
+            text-shadow: 0 0 10px rgba(255, 51, 68, 0.5);
+        }
+
+        .status-bar {
+            color: var(--accent-cyan);
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        /* ==========================================================================
+           2. 页面两栏布局
+           ========================================================================== */
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .profile-section {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--text-muted);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .profile-badge {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .avatar-placeholder {
+            width: 150px;
+            height: 180px;
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            margin: 0 auto 15px auto;
+            border: 3px solid var(--accent-crimson);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .avatar-placeholder::before {
+            content: "🕵️‍♂️";
+            font-size: 3.5rem;
+        }
+
+        .profile-table {
+            width: 100%;
+            margin-top: 15px;
+            border-collapse: collapse;
+        }
+        .profile-table td {
+            padding: 8px;
+            border-bottom: 1px solid #2d3748;
+        }
+        .profile-table td.label {
+            color: var(--accent-cyan);
+            font-weight: bold;
+            width: 35%;
+        }
+
+        .investigation-section {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--text-muted);
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 【核心修改区】根据全新1422x800的高清壁纸优化画布 */
+        .crime-scene {
+            position: relative;
+            width: 100%;
+            height: 420px; /* 稍微拉高画布，完美展现房间透视 */
+            background-image: url('https://img1.baidu.com/it/u=1680489345,1579772731&fm=253&app=120&f=JPEG?w=1422&h=800');
+            background-size: cover;
+            background-position: center;
+            border: 2px solid #4a5568;
+            overflow: hidden;
+            border-radius: 6px;
+            cursor: crosshair; 
+        }
+
+        /* 全黑夜视遮罩层 */
+        .scene-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.96); /* 增强黑暗对比度 */
+            pointer-events: none; 
+            transition: background 0.05s linear;
+        }
+
+        .scene-instruction {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 240, 255, 0.2);
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border-left: 3px solid var(--accent-cyan);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* 线索底层基础样式 */
+        .clue {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 5;
+            opacity: 0; /* 默认由高级智能 JS 动态控制透明度，防止盲区死锁 */
+            transform: scale(0.8);
+            transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        /* 当手电筒完全聚焦照亮线索时，附加的高级霓虹灯光效 */
+        .clue.illuminated {
+            box-shadow: 0 0 20px var(--accent-cyan), inset 0 0 10px rgba(0,240,255,0.5);
+            background: rgba(0, 240, 255, 0.25);
+        }
+
+        /* 🔴【全新坐标重构】深度适配百度高清办公室背景图的透视： */
+        #clue-1 { 
+            top: 76%; 
+            left: 35%; 
+            font-size: 1.6rem; 
+        } /* 烟蒂：精准落在这张图中央偏左的办公桌底下阴影处 */
+
+        #clue-2 { 
+            top: 72%; 
+            left: 82%; 
+            font-size: 1.6rem; 
+        } /* 请假条：精准落在右侧远端地毯靠墙的碎纸机/垃圾桶死角 */
+
+        #clue-3 { 
+            top: 48%; 
+            left: 55%; 
+            font-size: 1.6rem; 
+        } /* 加密U盘：精准落在这张图正中办公桌上的电脑主机/屏幕后方 */
+
+
+        .clue-display-board {
+            margin-top: 15px;
+            background-color: #0f111a;
+            padding: 15px;
+            border-left: 4px solid var(--accent-cyan);
+            min-height: 80px;
+        }
+
+        /* ==========================================================================
+           3. 三位嫌疑人排版区域
+           ========================================================================== */
+        .suspects-title {
+            text-align: center;
+            margin: 40px 0 20px 0;
+            color: var(--accent-cyan);
+            font-size: 1.8rem;
+        }
+
+        .suspects-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto 40px auto;
+        }
+
+        .suspect-card {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border: 1px solid #4a5568;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .suspect-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 240, 255, 0.2);
+        }
+
+        .suspect-photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #2d3748;
+            margin: 0 auto 15px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            border: 2px solid var(--text-muted);
+        }
+
+        .suspect-card h3 {
+            margin-bottom: 10px;
+            color: var(--text-light);
+        }
+
+        .suspect-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #2d3748;
+            text-align: left;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .suspect-details.active {
+            display: block;
+        }
+
+        .btn-interrogate {
+            background-color: transparent;
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .btn-interrogate:hover {
+            background-color: var(--accent-cyan);
+            color: #000;
+        }
+
+        /* ==========================================================================
+           4. 最后的正义审判指控区
+           ========================================================================== */
+        .judgment-section {
+            max-width: 600px;
+            margin: 0 auto 50px auto;
+            background: linear-gradient(135deg, #1a1d29 0%, #2d1722 100%);
+            border: 1px solid var(--accent-crimson);
+            padding: 25px;
+            text-align: center;
+            border-radius: 8px;
+        }
+
+        .judgment-section select {
+            background-color: var(--bg-dark);
+            color: white;
+            padding: 10px;
+            border: 1px solid var(--accent-crimson);
+            width: 60%;
+            margin: 15px 0;
+            font-size: 1rem;
+        }
+
+        .btn-accuse {
+            background-color: var(--accent-crimson);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px rgba(255,51,68,0.4);
+        }
+        .btn-accuse:hover {
+            background-color: #ff5566;
+            box-shadow: 0 0 20px rgba(255,51,68,0.8);
+        }
+
+        #game-result {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .success-text { color: #48bb78; text-shadow: 0 0 8px rgba(72,187,120,0.5); }
+        .fail-text { color: var(--accent-crimson); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CRIME SCENE INVESTIGATION</h1>
+        <div class="status-bar">系统状态: 案件侦破中... | 授权侦探: Student_ID_Grade8</div>
+    </header>
+
+    <main class="main-container">
+        
+        <section class="profile-section">
+            <h2 style="color: var(--accent-crimson); margin-bottom: 15px;">受害者核心卷宗</h2>
+            <div class="profile-badge">
+                <div class="avatar-placeholder"></div>
+                <h3>高智超 (Principal Gao)</h3>
+                <p style="color: var(--accent-crimson); font-size: 0.85rem;">[ 状态：离奇失踪 ]</p>
+            </div>
+            <p style="font-size: 0.9rem; text-indent: 2em; color: #cbd5e0;">
+                简介：现任国际学校校长，于昨日晚 22:00 完成巡校后进入办公室，随后与外界失去联系。保安在今晨例行检查时发现其办公室门虚掩，内部有打斗撕扯痕迹。
+            </p>
+            <table class="profile-table">
+                <tr><td class="label">年龄</td><td>48 岁</td></tr>
+                <tr><td class="label">最后目击地</td><td>行政楼4楼校长室</td></tr>
+                <tr><td class="label">案发时间</td><td>预估昨晚 22:30 - 23:30</td></tr>
+                <tr><td class="label">现场遗留物</td><td>打破的咖啡杯、翻倒的座椅</td></tr>
+            </table>
+        </section>
+
+        <section class="investigation-section">
+            <h2 style="color: var(--accent-cyan); margin-bottom: 15px;">第一现场：校长办公室区域扫描</h2>
+            
+            <div class="crime-scene" id="crime-scene-area">
+                <div class="scene-instruction">💡 移动手电筒彻底照亮隐藏角落，【点击】亮起的图标提取物证：</div>
+                <div class="scene-overlay" id="flashlight-overlay"></div>
+                
+                <div class="clue" id="clue-1" data-info="【高档雪茄烟蒂】: 在办公桌正下方的死角里被发现。校长本人对烟草严重过敏，但张副校长最近办公室内经常散落高档雪茄盒。">🚬</div>
+                <div class="clue" id="clue-2" data-info="【被撕碎的请假条】: 散落在房间角落的碎纸机边缘。是门卫李大叔下周的加急请假申请，上面被校长用红笔狠狠批示‘驳回！校内硬件升级关键期，所有人禁止离校’！">📄</div>
+                <div class="clue" id="clue-3" data-info="【加密黑客U盘】: 插在办公桌电脑主机后置网口上。状态灯仍在闪烁，系统显示正在强行导出学校核心网络服务器的保密资产数据。Alex 是全校唯一拥有机房后门钥匙和拷贝技术的人。">💾</div>
+            </div>
+
+            <div class="clue-display-board">
+                <span style="color: var(--accent-cyan);">🔬 侦探分析仪输出：</span>
+                <p id="clue-text" style="color: #a0aec0; margin-top: 5px;">（当前没有目标。请把手电筒移入上方漆黑的办公室，寻找隐藏物证...）</p>
+            </div>
+        </section>
+
+    </main>
+
+    <h2 class="suspects-title">🕵️‍♂️ 犯罪嫌疑人提审名单</h2>
+    <section class="suspects-container">
+        
+        <article class="suspect-card" id="card-suspect1">
+            <div class="suspect-photo">👨‍💼</div>
+            <h3>张副校长 (Vice Principal)</h3>
+            <p style="font-size: 0.85rem; color: var(--accent-cyan);">职位: 教学业务副校长</p>
+            <button class="btn-interrogate" onclick="toggleSuspect('details-1')">审讯供词</button>
+            <div class="suspect-details" id="details-1">
+                <p><strong>不在场证明：</strong> 昨晚自称一直在一楼大办公室批改评估材料，有大楼出门签到记录。但无法提供22:30后具体时间段的独立证人。</p>
+                <p style="margin-top: 5px; color: #fc8181;"><strong>作案动机：</strong> 校长近期正准备向学校董事会提交其在教材采购中收取巨额回扣的开除报告。</p>
+            </div>
+        </article>
+
+        <article class="suspect-card" id="card-suspect2">
+            <div class="suspect-photo">👴</div>
+            <h3>李大叔 (The Janitor)</h3>
+            <p style="font-size: 0.85rem; color: var(--accent-cyan);">职位: 资深校园门卫</p>
+            <button class="btn-interrogate" onclick="toggleSuspect('details-2')">审讯供词</button>
+            <div class="suspect-details" id="details-2">
+                <p><strong>不在场证明：</strong> 称自己22:00雷打不动回传达室睡觉了。但他拥有全校大楼所有行政办公室的紧急备用钥匙。</p>
+                <p style="margin-top: 5px; color: #fc8181;"><strong>作案动机：</strong> 老家危房倒塌急需请假被校长严厉驳回，曾对人扬言要给校长“一点颜色看看”。</p>
+            </div>
+        </article>
+
+        <article class="suspect-card" id="card-suspect3">
+            <div class="suspect-photo">🧑‍💻</div>
+            <h3>Alex (IT Administrator)</h3>
+            <p style="font-size: 0.85rem; color: var(--accent-cyan);">职位: 网络资产管理员</p>
+            <button class="btn-interrogate" onclick="toggleSuspect('details-3')">审讯供词</button>
+            <div class="suspect-details" id="details-3">
+                <p><strong>不在场证明：</strong> 当晚在中心机房进行后台维护。但核心服务器日志曝光，当晚22:50分机房曾出现了长达25分钟的异常离线空窗期。</p>
+                <p style="margin-top: 5px; color: #fc8181;"><strong>作案动机：</strong> 企图黑入学校系统窃取核心资产代码售卖给竞争对手，在案发当晚极有可能被折返的校长撞破。</p>
+            </div>
+        </article>
+
+    </section>
+
+    <section class="judgment-section">
+        <h2 style="color: var(--accent-crimson);">⚖️ 正义审判庭</h2>
+        <p style="font-size: 0.9rem;">结合搜寻到的全部3个关键证物以及嫌疑人的背景，锁定真正的凶手：</p>
+        
+        <select id="suspect-select">
+            <option value="">-- 请选择你锁定的犯罪嫌疑人 --</option>
+            <option value="vice-principal">张副校长 (嫌疑人1)</option>
+            <option value="janitor">门卫李大叔 (嫌疑人2)</option>
+            <option value="it-admin">IT管理员 Alex (嫌疑人3)</option>
+        </select>
+        <br>
+        <button class="btn-accuse" onclick="submitAccusation()">发起最终公诉</button>
+        
+        <div id="game-result"></div>
+    </section>
+
+    <script>
+        const scene = document.getElementById('crime-scene-area');
+        const overlay = document.getElementById('flashlight-overlay');
+        const clueText = document.getElementById('clue-text');
+        const clues = document.querySelectorAll('.clue');
+
+        /* 🔬 核心升级：智能光束距离运算（解决线索悬停盲区） */
+        scene.addEventListener('mousemove', (e) => {
+            const rect = scene.getBoundingClientRect();
+            // 获取当前鼠标相对画布的坐标
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // 1. 动态绘制炫酷的手电筒光束圈（半径60px）
+            overlay.style.background = `radial-gradient(circle 60px at ${mouseX}px ${mouseY}px, transparent 100%, rgba(0,0,0,0.97) 100%)`;
+
+            // 2. 实时对每一个线索进行“雷达波探测”
+            clues.forEach(clue => {
+                // 计算线索小圆圈的几何中心坐标
+                const clueX = clue.offsetLeft + clue.offsetWidth / 2;
+                const clueY = clue.offsetTop + clue.offsetHeight / 2;
+                
+                // 运用勾股定理：计算鼠标与线索之间的直线像素距离
+                const distance = Math.sqrt(Math.pow(mouseX - clueX, 2) + Math.pow(mouseY - clueY, 2));
+                
+                // 当手电筒光束（60px半径）逐渐接近并覆盖线索时
+                if (distance < 75) {
+                    // 动态计算光线强度：离得越近，线索越亮（丝滑浮现）
+                    let brightness = (75 - distance) / 45;
+                    clue.style.opacity = Math.min(brightness, 1);
+                    clue.style.transform = `scale(${0.8 + (Math.min(brightness, 1) * 0.4)})`;
+                    clue.classList.add('illuminated');
+                } else {
+                    // 光束移开，线索立刻遁入黑暗
+                    clue.style.opacity = "0";
+                    clue.style.transform = "scale(0.8)";
+                    clue.classList.remove('illuminated');
+                }
+            });
+        });
+
+        // 鼠标彻底离开房间时，强制恢复绝对黑暗
+        scene.addEventListener('mouseleave', () => {
+            overlay.style.background = 'rgba(0, 0, 0, 0.96)';
+            clues.forEach(clue => {
+                clue.style.opacity = "0";
+                clue.classList.remove('illuminated');
+            });
+        });
+
+        /* 点击线索提取案情描述 */
+        clues.forEach(clue => {
+            clue.addEventListener('click', () => {
+                const info = clue.getAttribute('data-info');
+                clueText.innerHTML = `🧬 <span style="color:#00f0ff; font-weight:bold;">成功提取证物：</span> ${info}`;
+            });
+        });
+
+        /* 嫌疑人卡片折叠 */
+        function toggleSuspect(id) {
+            const detailPanel = document.getElementById(id);
+            detailPanel.classList.toggle('active');
+        }
+
+        /* 真相裁决 */
+        function submitAccusation() {
+            const selectValue = document.getElementById('suspect-select').value;
+            const resultDiv = document.getElementById('game-result');
+            
+            if (!selectValue) {
+                resultDiv.innerHTML = "<span class='fail-text'>❌ 错误：公诉前必须先指认一名主犯！</span>";
+                return;
+            }
+            
+            if (selectValue === 'it-admin') {
+                resultDiv.innerHTML = `<span class='success-text'>🎉 案件大白！正义得雪！！ 🎉</span><br>
+                <p style='font-size:0.95rem; margin-top:10px; color:#cbd5e0;'>
+                    精彩的推理！你利用在桌面上隐秘发现的【加密U盘】，顺藤摸瓜逼迫网络管理员 Alex 交代了全部罪行。他承认昨晚利用机房下线空窗期潜入校长室窃取数据，被校长撞破后将其迷晕藏匿在地下机房。校长已平安获救！
+                </p>`;
+            } else {
+                resultDiv.innerHTML = "<span class='fail-text'>❌ 指控失败！证据链存在致命矛盾。对方的不在场证明无法被推翻，或者该证物无法建立直接因果关系。真凶正在试图销毁数据，请重新搜寻！</span>";
+            }
+        }
+    </script>
+</body>
+</html>
